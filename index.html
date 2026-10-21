@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frontier Tour Köln</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Frontier Köln">
+<meta name="theme-color" content="#0b6bcb">
+<style>
+  :root {
+    --bg: #f4f6f8; --card: #ffffff; --text: #1d2329; --muted: #66707a; --line: #dde2e7;
+    --now: #fff4cc; --now-border: #e0a800; --next: #eaf3ff; --accent: #0b6bcb; --done: #2e8b57;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121518; --card: #1c2126; --text: #e8ecef; --muted: #9aa4ad; --line: #2c333a;
+      --now: #3d3412; --now-border: #e0a800; --next: #15283d; --accent: #5aa9ff; --done: #5cc98a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 16px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--line);
+           padding: calc(env(safe-area-inset-top) + 10px) 16px 10px; display: flex; align-items: center; gap: 10px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; }
+  #clock { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; }
+  button { border: 0; background: var(--accent); color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 14px; }
+  button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  #info { font-size: 12px; color: var(--muted); padding: 6px 16px 0; }
+  main { padding: 4px 16px 24px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 12px; margin: 10px 0; scroll-margin-top: 80px; }
+  .card.past { opacity: .55; }
+  .card.now { background: var(--now); border: 2px solid var(--now-border); opacity: 1; }
+  .card.next { background: var(--next); }
+  .top { display: flex; gap: 10px; align-items: flex-start; }
+  .top input[type=checkbox] { width: 24px; height: 24px; margin-top: 2px; flex: none; accent-color: var(--done); }
+  .time { font-weight: 600; font-variant-numeric: tabular-nums; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 6px; margin-left: 6px;
+           background: var(--now-border); color: #000; }
+  .card.done .title { text-decoration: line-through; color: var(--muted); }
+  .room { font-size: 14px; color: var(--muted); }
+  details { margin-top: 6px; font-size: 14px; color: var(--muted); }
+  details p { margin: 6px 0; }
+  textarea { width: 100%; min-height: 60px; margin-top: 8px; padding: 8px; font: inherit; font-size: 16px;
+             border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text); }
+  .saved { font-size: 12px; color: var(--muted); min-height: 16px; }
+  footer { padding: 8px 16px 40px; display: flex; flex-wrap: wrap; gap: 8px; }
+  #export { width: 100%; min-height: 120px; display: none; }
+  nav { display: flex; gap: 0; background: var(--card); border-bottom: 1px solid var(--line);
+        position: sticky; top: calc(env(safe-area-inset-top) + 55px); z-index: 4; }
+  nav button { flex: 1; background: transparent; color: var(--muted); border-radius: 0; padding: 10px;
+               border-bottom: 3px solid transparent; font-weight: 600; }
+  nav button.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .filters { padding: 10px 16px 0; }
+  .filters input[type=search] { width: 100%; padding: 10px; font-size: 16px; border: 1px solid var(--line);
+                                border-radius: 8px; background: var(--card); color: var(--text); }
+  .chips { display: flex; gap: 6px; overflow-x: auto; padding: 8px 0; -webkit-overflow-scrolling: touch; }
+  .chip { flex: none; background: var(--card); color: var(--text); border: 1px solid var(--line);
+          border-radius: 16px; padding: 6px 12px; font-size: 14px; }
+  .chip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
+  #count { font-size: 12px; color: var(--muted); }
+  .meta { font-size: 13px; color: var(--muted); }
+  .speaker { font-size: 13px; color: var(--muted); font-style: italic; }
+  .row { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .star { background: transparent; color: var(--now-border); font-size: 24px; padding: 0 4px; line-height: 1; }
+  .tag { display: inline-block; font-size: 11px; font-weight: 700; padding: 1px 6px; border-radius: 6px;
+         background: var(--done); color: #fff; margin-left: 4px; }
+  .slot { font-weight: 700; margin: 16px 0 4px; color: var(--muted); font-size: 14px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Frontier Tour Köln</h1>
+  <span id="clock"></span>
+  <button onclick="jumpToNow()">Jetzt</button>
+</header>
+<nav>
+  <button id="tab-plan" class="active" onclick="showTab('plan')">Mein Plan</button>
+  <button id="tab-prog" onclick="showTab('prog')">Programm</button>
+</nav>
+<div id="info"></div>
+<main id="list"></main>
+<section id="program" hidden>
+  <div class="filters">
+    <input type="search" id="q" placeholder="Suchen: Titel, Speaker, Raum, Code …" oninput="renderProgram()">
+    <div class="chips" id="timeChips"></div>
+    <div class="chips" id="typeChips"></div>
+    <div id="count"></div>
+  </div>
+  <main id="progList"></main>
+</section>
+<footer>
+  <button onclick="copyExport()">Notizen kopieren</button>
+  <button class="secondary" onclick="shareExport()">Teilen</button>
+  <button class="secondary" onclick="downloadExport()">Als CSV laden</button>
+  <textarea id="export" readonly></textarea>
+</footer>
+
+<script src="program.js"></script>
+<script>
+// ---------- Agenda (fest eingebaut, Donnerstag, 22. Oktober) ----------
+const AGENDA = [
+  { id: 'a01', zeit: '08:00–08:20', was: 'Ankommen, Badge holen, Kaffee', raum: 'Connection Hub, Level 0', warum: 'Lockerer Start', alt: '' },
+  { id: 'a02', zeit: '08:20–08:35', was: 'Cowork über Ihre Geschäftssysteme hinweg nutzbar machen (LTG96-CGN)', raum: 'Lightning Talks 2, Level 0', warum: 'Eigene Skills und MCP-Server in Copilot Cowork, Plugin-Setup, Anmeldung und Verteilung im Unternehmen. Sehr nah an FDE-Rolle und Self-Service-Plattform.', alt: '' },
+  { id: 'a03', zeit: '08:35–09:00', was: 'Networking, gerne direkt mit dem Speaker', raum: 'Connection Hub', warum: 'Fragen zu Plugins, Authentifizierung und Bereitstellung', alt: '' },
+  { id: 'a04', zeit: '09:00–09:45', was: 'Vom Assistenten zum Autopiloten: Das KI-Spektrum (BRK221)', raum: 'Breakout 2, Hall 1', warum: 'Wann reicht ein Assistent, wann braucht es einen Agenten? Kernfrage für die Use-Case-Beratung.', alt: 'BRK016: Kosten von agentischer KI realistisch rechnen (Breakout 4)' },
+  { id: 'a05', zeit: '09:45–10:15', was: 'Puffer, Networking, guten Platz für die Keynote suchen', raum: 'Hall 1', warum: '', alt: '' },
+  { id: 'a06', zeit: '10:15–11:45', was: 'Keynote: Aufbau der KI-Frontier-Region in Deutschland (KEY101)', raum: 'Mainstage, Hall 1', warum: 'Die große Richtung von Microsoft, wichtig für Copilot gegen offene Plattform', alt: 'Livestream im Overflow-Raum (KEY102, Breakout 2)' },
+  { id: 'a07', zeit: '11:45–12:15', was: 'Mittagessen, Gespräche nach der Keynote', raum: 'Catering', warum: 'Viele Leute sind da und offen für Gespräche', alt: 'LTG114 um 12:00: AI Skills Navigator (Lightning Talks 1)' },
+  { id: 'a08', zeit: '12:15–13:30', was: 'Lab: Wie weit ein Agent in Copilot Studio geht (ILL224)', raum: 'Lab 4, Hall 1', warum: 'Selbst einen Agenten bauen, echte FDE-Praxis', alt: 'BRK019: Der Moment, in dem AI aufhört, ein Projekt zu sein (Breakout 3)' },
+  { id: 'a09', zeit: '13:30–13:45', was: 'Kurze Pause, Snack', raum: '', warum: '', alt: '' },
+  { id: 'a10', zeit: '13:45–14:30', was: 'Aufbau Ihres Frontier Center of Excellence (BRK110)', raum: 'Breakout 1, Confex Level 2', warum: 'CoE-Modell für KI mit Fokus auf Umsetzung. Passt direkt zum Beratungsservice.', alt: 'BRK330: Agenten mit Foundry und GitHub Copilot' },
+  { id: 'a11', zeit: '14:40–14:55', was: 'Das Playbook zur Einführung von Microsoft 365 Copilot (LTG122)', raum: 'Lightning Talks 1, Level 0', warum: 'Was man bei der Einführung zuerst tut und was man vermeidet', alt: '' },
+  { id: 'a12', zeit: '15:00–15:45', was: 'Turn AI adoption into AI advantage (BRK020, Englisch)', raum: 'Breakout 4, Hall 1', warum: 'Wie Adoption zur Transformation wird. Ideen für Ziele und Kennzahlen des Services.', alt: 'BRK240: Kontextbezogene Agenten mit Microsoft IQ' },
+  { id: 'a13', zeit: '15:45–16:15', was: 'Networking, Partnerstände, spontane Gespräche', raum: 'Expo, Connection Hub', warum: 'Freie Zeit für Gespräche, die sich am Tag ergeben', alt: 'LTG232 um 16:00: Agentenbau über Hello World hinaus' },
+  { id: 'a14', zeit: '16:20–16:35', was: 'Zeigen statt erzählen: Wie Teams den Mehrwert von Copilot entdecken (LTG161)', raum: 'Lightning Talks 2, Level 0', warum: 'Adoption durch Demos, übertragbar auf die Beratungsslots', alt: 'BRK114 um 16:15: Die Angst vor KI ablegen (Breakout 1)' },
+  { id: 'a15', zeit: '16:35–17:15', was: 'Letzte Gespräche, Notizen sichern, drei wichtigste Erkenntnisse festhalten', raum: '', warum: 'Damit du etwas Konkretes mitnimmst', alt: 'Quiz zu KI-Fähigkeiten (LTG115, 17:00)' }
+];
+
+// ---------- Lokaler Speicher (bleibt auf dem Handy) ----------
+const KEY = 'frontier-koeln-2026';
+let state = load();
+function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+function persist() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); return true; } catch (e) { return false; }
+}
+const get = id => state[id] || { done: false, note: '' };
+
+// ---------- Zeitlogik (Uhr vom Handy, Test über ?t=10:30) ----------
+const TEST_TIME = (new URLSearchParams(location.search).get('t') || '').match(/^\d{1,2}:\d{2}$/) ? new URLSearchParams(location.search).get('t') : '';
+function nowMinutes() {
+  if (TEST_TIME) { const p = TEST_TIME.split(':'); return (+p[0]) * 60 + (+p[1]); }
+  const d = new Date(); return d.getHours() * 60 + d.getMinutes();
+}
+function parseRange(text) {
+  const m = text.match(/(\d{1,2}):(\d{2})\D+(\d{1,2}):(\d{2})/);
+  return m ? { start: (+m[1]) * 60 + (+m[2]), end: (+m[3]) * 60 + (+m[4]) } : null;
+}
+const esc = s => String(s || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// ---------- Darstellung ----------
+function render() {
+  document.getElementById('list').innerHTML = AGENDA.map(r => {
+    const s = get(r.id);
+    return `
+    <div class="card ${s.done ? 'done' : ''}" id="row-${r.id}">
+      <div class="top">
+        <input type="checkbox" ${s.done ? 'checked' : ''} onchange="toggleDone('${r.id}', this.checked)">
+        <div>
+          <div class="time">${esc(r.zeit)}<span class="badge" hidden>JETZT</span></div>
+          <div class="title">${esc(r.was)}</div>
+          <div class="room">${esc(r.raum)}</div>
+        </div>
+      </div>
+      ${r.warum || r.alt ? `<details><summary>Details</summary>
+        ${r.warum ? `<p><b>Warum:</b> ${esc(r.warum)}</p>` : ''}
+        ${r.alt ? `<p><b>Alternative:</b> ${esc(r.alt)}</p>` : ''}
+      </details>` : ''}
+      <textarea placeholder="Notiz …" oninput="noteChanged('${r.id}', this.value)">${esc(s.note)}</textarea>
+      <div class="saved" id="saved-${r.id}"></div>
+    </div>`;
+  }).join('');
+  highlight();
+}
+
+function highlight() {
+  const now = nowMinutes();
+  document.getElementById('clock').textContent = TEST_TIME ? 'Test ' + TEST_TIME
+    : new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+  let current = null, next = null;
+  AGENDA.forEach(r => {
+    const el = document.getElementById('row-' + r.id);
+    const range = parseRange(r.zeit);
+    el.classList.remove('past', 'now', 'next');
+    el.querySelector('.badge').hidden = true;
+    if (!range) return;
+    if (now >= range.end) el.classList.add('past');
+    else if (now >= range.start && !current) { el.classList.add('now'); el.querySelector('.badge').hidden = false; current = el; }
+    else if (now < range.start && !next) { el.classList.add('next'); next = el; }
+  });
+  return current || next;
+}
+function jumpToNow() {
+  if (currentTab === 'prog') { timeFilter = 'now'; renderProgram(); window.scrollTo({ top: 0, behavior: 'smooth' }); return; }
+  const target = highlight();
+  if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ---------- Speichern (sofort, lokal) ----------
+function toggleDone(id, checked) {
+  state[id] = Object.assign(get(id), { done: checked });
+  document.getElementById('row-' + id).classList.toggle('done', checked);
+  mark(id);
+}
+function noteChanged(id, value) {
+  state[id] = Object.assign(get(id), { note: value });
+  mark(id);
+}
+function mark(id) {
+  const ok = persist();
+  const el = document.getElementById('saved-' + id);
+  if (el) el.textContent = ok
+    ? 'Lokal gespeichert ' + new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    : 'Speichern nicht möglich – bitte „Notizen kopieren“ nutzen';
+}
+
+// ---------- Gesamtprogramm als Nachschlagewerk ----------
+let currentTab = 'plan';
+let timeFilter = 'now';   // 'now', 'all', 'fav' oder Stunde wie '13'
+let typeFilter = 'all';   // 'all', 'BRK', 'LTG', 'ILL', 'KEY'
+const PLAN_CODES = new Set(AGENDA.map(r => (r.was.match(/\(([A-Z]{3}\d+(?:-CGN)?)/) || [])[1]).filter(Boolean).map(c => c.replace('-CGN', '')));
+const toMin = t => { const p = t.split(':'); return (+p[0]) * 60 + (+p[1]); };
+const TYPES = { all: 'Alle Typen', KEY: 'Keynote', BRK: 'Breakout', LTG: 'Lightning Talk', ILL: 'Lab' };
+
+function showTab(tab) {
+  currentTab = tab;
+  document.getElementById('tab-plan').classList.toggle('active', tab === 'plan');
+  document.getElementById('tab-prog').classList.toggle('active', tab === 'prog');
+  document.getElementById('list').hidden = tab !== 'plan';
+  document.getElementById('program').hidden = tab !== 'prog';
+  if (tab === 'prog') renderProgram(); else setTimeout(jumpToNow, 50);
+  window.scrollTo(0, 0);
+}
+
+function renderChips() {
+  const hours = [...new Set(PROGRAM.map(p => p.start.slice(0, 2)))].sort();
+  const tc = [['now', 'Jetzt & gleich'], ['all', 'Ganzer Tag'], ['fav', '★ Gemerkt']].concat(hours.map(h => [h, h + ' Uhr']));
+  document.getElementById('timeChips').innerHTML = tc.map(([k, l]) =>
+    `<button class="chip ${timeFilter === k ? 'on' : ''}" onclick="timeFilter='${k}';renderProgram()">${l}</button>`).join('');
+  document.getElementById('typeChips').innerHTML = Object.keys(TYPES).map(k =>
+    `<button class="chip ${typeFilter === k ? 'on' : ''}" onclick="typeFilter='${k}';renderProgram()">${TYPES[k]}</button>`).join('');
+}
+
+function matchesTime(p) {
+  const s = toMin(p.start), e = toMin(p.end), now = nowMinutes();
+  if (timeFilter === 'all') return true;
+  if (timeFilter === 'fav') return !!get(p.id).fav;
+  if (timeFilter === 'now') return (now >= s && now < e) || (s >= now && s <= now + 45);
+  const h = (+timeFilter) * 60;
+  return s < h + 60 && e > h;   // läuft in dieser Stunde
+}
+
+function renderProgram() {
+  renderChips();
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  const now = nowMinutes();
+  const list = PROGRAM.filter(p => matchesTime(p))
+    .filter(p => typeFilter === 'all' || p.code.startsWith(typeFilter))
+    .filter(p => !q || [p.titel, p.speaker, p.raum, p.code, p.text].join(' ').toLowerCase().includes(q))
+    .sort((a, b) => a.start.localeCompare(b.start) || a.raum.localeCompare(b.raum));
+  document.getElementById('count').textContent = list.length + ' Sessions' +
+    (timeFilter === 'now' ? ' – laufend oder in den nächsten 45 Minuten' : '');
+  let lastSlot = '';
+  document.getElementById('progList').innerHTML = list.length ? list.map(p => {
+    const s = get(p.id);
+    const running = now >= toMin(p.start) && now < toMin(p.end);
+    const slot = p.start !== lastSlot ? `<div class="slot">${p.start} Uhr</div>` : '';
+    lastSlot = p.start;
+    return slot + `
+    <div class="card ${running ? 'now' : (now >= toMin(p.end) ? 'past' : '')}">
+      <div class="row">
+        <div>
+          <div class="time">${p.start}–${p.end}${running ? '<span class="badge">LÄUFT</span>' : ''}${PLAN_CODES.has(p.code.replace('-CGN','')) ? '<span class="tag">Im Plan</span>' : ''}</div>
+          <div class="title">${esc(p.titel)}</div>
+          <div class="meta">${esc(p.raum)} · ${esc(p.code)} · ${esc(p.lang)}</div>
+          ${p.speaker ? `<div class="speaker">${esc(p.speaker)}</div>` : ''}
+        </div>
+        <button class="star" onclick="toggleFav('${p.id}')" aria-label="Merken">${s.fav ? '★' : '☆'}</button>
+      </div>
+      <details ${s.note ? 'open' : ''}><summary>Beschreibung und Notiz</summary>
+        <p>${esc(p.text)}</p>
+        <textarea placeholder="Notiz …" oninput="noteChanged('${p.id}', this.value)">${esc(s.note)}</textarea>
+        <div class="saved" id="saved-${p.id}"></div>
+      </details>
+    </div>`;
+  }).join('') : '<p class="meta">Keine Session passt zu diesem Filter.</p>';
+}
+
+function toggleFav(id) {
+  state[id] = Object.assign(get(id), { fav: !get(id).fav });
+  persist();
+  renderProgram();
+}
+
+// ---------- Export für die Google-Tabelle ----------
+function buildExport() {
+  const clean = s => String(s || '').replace(/[\t\r\n]+/g, ' ').trim();
+  const lines = ['Zeit\tWas\tErledigt\tNotiz'];
+  AGENDA.forEach(r => { const s = get(r.id); lines.push([r.zeit, r.was, s.done ? 'TRUE' : 'FALSE', clean(s.note)].map(clean).join('\t')); });
+  const extra = PROGRAM.filter(p => get(p.id).fav || get(p.id).note);
+  if (extra.length) {
+    lines.push('', 'Programm\tSession\tGemerkt\tNotiz');
+    extra.forEach(p => { const s = get(p.id); lines.push([p.start + '–' + p.end, p.titel + ' (' + p.code + ')', s.fav ? 'TRUE' : 'FALSE', s.note].map(clean).join('\t')); });
+  }
+  return lines.join('\n');
+}
+async function copyExport() {
+  const text = buildExport();
+  try { await navigator.clipboard.writeText(text); alertInfo('Kopiert. In Google Sheets in eine leere Zelle einfügen.'); }
+  catch (e) { const t = document.getElementById('export'); t.style.display = 'block'; t.value = text; t.select(); alertInfo('Text markiert – bitte manuell kopieren.'); }
+}
+async function shareExport() {
+  if (navigator.share) { try { await navigator.share({ title: 'Frontier Tour Notizen', text: buildExport() }); } catch (e) {} }
+  else copyExport();
+}
+function downloadExport() {
+  const csv = '﻿' + buildExport().split('\n').map(l => l.split('\t').map(v => '"' + v.replace(/"/g, '""') + '"').join(';')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+  a.download = 'frontier-tour-notizen.csv'; a.click();
+}
+function alertInfo(msg) { document.getElementById('info').textContent = msg; }
+
+// ---------- Offline-Fähigkeit ----------
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then(() => {
+    alertInfo(navigator.onLine ? 'Offline bereit. Notizen bleiben nur auf diesem Gerät.' : 'Offline-Modus. Alles wird lokal gespeichert.');
+  }).catch(() => alertInfo('Offline-Speicher nicht verfügbar – Seite bitte über https öffnen.'));
+}
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
+
+render();
+setTimeout(jumpToNow, 300);
+setInterval(() => { highlight(); if (currentTab === 'prog' && document.activeElement.tagName !== 'TEXTAREA') renderProgram(); }, 60000);
+document.addEventListener('visibilitychange', () => { if (!document.hidden && currentTab === 'plan') jumpToNow(); });
+</script>
+</body>
+</html>
